@@ -64,22 +64,32 @@ module.exports.prototype.getRefreshToken = function(redirect_uri, code){
 // https://gw.api.alibaba.com/openapi/param2/1/system.oauth2/getToken/YOUR_APPKEY
 // 请求参数如下：
 // grant_type=refresh_token&client_id=YOUR_APPKEY&client_secret=YOUR_APPSECRET&refresh_token=REFRESH_TOKEN
-module.exports.prototype.getAccessToken = function(refresh_token){
-  var that = this,
-      uri = "https://gw.api.alibaba.com/openapi/param2/1/system.oauth2/getToken/"+that.clientKey,
-      params = {
-        grant_type: "refresh_token",
-        client_id: that.clientKey,
-        client_secret: that.clientSecret,
-        refresh_token: refresh_token
-      },
-      options = {
-        uri: uri,
-        method: "POST",
-        form: params
-      }
+module.exports.prototype.getAccessToken = function(refresh_token, isValid, store){
+  if(isValid && store && isValid()){
+    return new Promise(function(resolve, reject){
+      store(resolve)
+    })
+  }else{
+    var that = this,
+        uri = "https://gw.api.alibaba.com/openapi/param2/1/system.oauth2/getToken/"+that.clientKey,
+        params = {
+          grant_type: "refresh_token",
+          client_id: that.clientKey,
+          client_secret: that.clientSecret,
+          refresh_token: refresh_token
+        },
+        options = {
+          uri: uri,
+          method: "POST",
+          form: params
+        }
 
-  return _request(options)
+    return _request(options)
+  }
+}
+
+function _getAccessToken(){
+
 }
 
 
