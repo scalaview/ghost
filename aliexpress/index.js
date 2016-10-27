@@ -98,6 +98,22 @@ module.exports.prototype.getRefreshToken = function(redirect_uri, code, store){
 
 }
 
+module.exports.prototype.getStoreRefreshToken = function(){
+  var that = this
+  return new Promise(function(resolve, reject){
+    client.hmgetAsync(["aliexpress:info", "refreshToken", "refreshTokenTimeout"]).then(function(data){
+      if(!data[0]){
+        throw new Error("Missing parameters: refresh_token")
+      }
+      that.refreshToken = data[0]
+      that.refreshTokenTimeout = data[1]
+      resolve(that.refreshToken, that.refreshTokenTimeout)
+    }).catch(function(err){
+      reject(err)
+    })
+  })
+}
+
 
 // https://gw.api.alibaba.com/openapi/param2/1/system.oauth2/getToken/YOUR_APPKEY
 // 请求参数如下：
@@ -111,31 +127,39 @@ module.exports.prototype.refreshAccessToken = function(refresh_token, isValid, s
       that.isValid = isValid || that.isValid
       that.refreshToken = refresh_token || that.refreshToken
 
+
   return new Promise(function(resolve, reject){
     if(that.isValid()){
       resolve(that.accessToken)
     }else{
-      var uri = "https://gw.api.alibaba.com/openapi/param2/1/system.oauth2/getToken/"+that.clientKey,
-          params = {
-            grant_type: "refresh_token",
-            client_id: that.clientKey,
-            client_secret: that.clientSecret,
-            refresh_token: that.refreshToken
-          },
-          options = {
-            uri: uri,
-            method: "POST",
-            form: params
-          }
-      _requestPost.call(that, options).then(function(data){
-        expiresIn = parseInt(data.expires_in)
-        that.accessToken = data.access_token
-        that.expireTime = ((new Date()).getTime() + expiresIn * 1000)
-        _store(data.access_token, expiresIn)
-        resolve(data.access_token)
-      }).catch(function(err){
-        reject(err)
-      })
+      if(!that.refreshToken){
+        that.getStoreRefreshToken().then(function(refreshToken){
+          var uri = "https://gw.api.alibaba.com/openapi/param2/1/system.oauth2/getToken/"+that.clientKey,
+              params = {
+                grant_type: "refresh_token",
+                client_id: that.clientKey,
+                client_secret: that.clientSecret,
+                refresh_token: that.refreshToken
+              },
+              options = {
+                uri: uri,
+                method: "POST",
+                form: params
+              }
+          _requestPost.call(that, options).then(function(data){
+            expiresIn = parseInt(data.expires_in)
+            that.accessToken = data.access_token
+            that.expireTime = ((new Date()).getTime() + expiresIn * 1000)
+            _store(data.access_token, expiresIn)
+            resolve(data.access_token)
+          }).catch(function(err){
+            reject(err)
+          })
+        }).catch(function(err){
+          console.log(err)
+          throw new Error("Missing parameters: refresh_token")
+        })
+      }
     }
   })
 }
@@ -183,7 +207,7 @@ function _onOffProducts(productIds, name){
         if(data.error_code){
           reject(new Error(data.error_code + ":" + data.error_message))
         }else{
-          resolve(data.success)
+          resolve(data.modifyCount, data.success)
         }
       }).catch(function(err){
         reject(err)
@@ -203,11 +227,14 @@ function _requestPost(options){
   return new Promise(function(resolve, reject){
     request.post(options, function(err, res, body){
       console.log(err, res.statusCode, body)
-      if (!err && res.statusCode == 200) {
+      if(err){
+        reject(err)
+      }else if(res.statusCode == 200) {
         var data = JSON.parse(body)
         resolve(data)
       }else{
-        reject(err)
+        var data = JSON.parse(body)
+        reject(data)
       }
     })
   })
