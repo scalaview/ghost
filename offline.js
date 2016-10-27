@@ -23,6 +23,7 @@ function offline() {
     }else{
       console.log("offline " + products.length + " products, success: " + modifyCount)
     }
+    process.exit()
   })
 }
 

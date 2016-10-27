@@ -23,6 +23,7 @@ function online() {
     }else{
       console.log("online " + products.length + " products, success: " + modifyCount)
     }
+    process.exit()
   })
 }
 
