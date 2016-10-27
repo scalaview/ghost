@@ -78,21 +78,21 @@ module.exports.prototype.getRefreshToken = function(redirect_uri, code, store){
         form: params
       },
       _store = store || function(refreshTokenTimeout, aliId, resourceOwner, expireTime, refreshToken, accessToken){
-        client.hmset(["aliexpress:info", "accessToken", accessToken, "expireTime", ((new Date()).getTime() + expireTime * 1000),
+        client.hmset(["aliexpress:info", "accessToken", accessToken, "expireTime", expireTime,
           "refreshTokenTimeout", refreshTokenTimeout, "aliId", aliId, "resourceOwner", resourceOwner, "refreshToken", refreshToken])
       }
 
-
   return new Promise(function(resolve, reject){
-    request.post(options, function(err, res, body){
-      console.log(err, res.statusCode, body)
-      if (!err && res.statusCode == 200) {
-        var data = JSON.parse(body)
-        _store(data.refresh_token_timeout, data.aliId, data.resource_owner, data.expires_in, data.refresh_token, data.access_token)
-        resolve(data.resource_owner, data.refresh_token, data.access_token)
-      }else{
-        reject(err)
-      }
+    _requestPost.call(that, options).then(function(data){
+      that.accessToken = data.access_token
+      that.expireTime = (new Date()).getTime() + data.expires_in * 1000
+      that.refreshToken = data.refresh_token
+      that.refreshTokenTimeout = data.refresh_token_timeout
+
+      _store(data.refresh_token_timeout, data.aliId, data.resource_owner, that.expireTime, data.refresh_token, data.access_token)
+      resolve(data.resource_owner, data.refresh_token, data.access_token)
+    }).catch(function(err){
+      reject(err)
     })
   })
 
@@ -127,18 +127,14 @@ module.exports.prototype.refreshAccessToken = function(refresh_token, isValid, s
             method: "POST",
             form: params
           }
-      request.post(options, function(err, res, body){
-        console.log(err, res.statusCode, body)
-        if (!err && res.statusCode == 200) {
-          var data = JSON.parse(body),
-          expiresIn = parseInt(data.expires_in)
-          that.accessToken = data.access_token
-          that.expireTime = ((new Date()).getTime() + expiresIn * 1000)
-          _store(data.access_token, expiresIn)
-          resolve(data.access_token)
-        }else{
-          reject(err)
-        }
+      _requestPost.call(that, options).then(function(data){
+        expiresIn = parseInt(data.expires_in)
+        that.accessToken = data.access_token
+        that.expireTime = ((new Date()).getTime() + expiresIn * 1000)
+        _store(data.access_token, expiresIn)
+        resolve(data.access_token)
+      }).catch(function(err){
+        reject(err)
       })
     }
   })
